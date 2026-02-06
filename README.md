@@ -72,6 +72,20 @@ python train_evaluate.py
 *   `download_data.py`: Script to download the dataset from Kaggle.
 *   `analyze_dataset.py`: Helper script to analyze dataset distribution (optional).
 
+
+## ⚔️ Fusion Strategy Comparison
+
+We compared **Early Fusion** vs. **Late Fusion**.
+*   **Late Fusion**: ~98.4% Accuracy
+*   **Early Fusion**: ~92.7% Accuracy
+
+Model | Train Time | Accuracy | Description
+--- | --- | --- | ---
+**Late Fusion** | 13s/epoch | 98.38% | 2x ResNet18 (Feature Concat)
+**Early Fusion** | 8.5s/epoch | 92.66% | 1x ResNet18 (Input Concat)
+
+👉 **[Read the Full Comparison Report](FUSION_COMPARISON.md)**
+
 ## 📊 Performance Metrics
 
 The system evaluates performance using:

@@ -5,10 +5,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import numpy as np
+import time
 
 from multimodal_dataset import MULBDataset
 from late_fusion_model import LateFusionModel
@@ -22,10 +21,12 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10
         total = 0
         
         print(f"Epoch {epoch+1}/{num_epochs}", flush=True)
+        start_time = time.time()
+        
         for i, (hand_imgs, iris_imgs, labels) in enumerate(train_loader):
-            hand_imgs = hand_imgs.to(device)
-            iris_imgs = iris_imgs.to(device)
-            labels = labels.to(device)
+            hand_imgs = hand_imgs.to(device, non_blocking=True)
+            iris_imgs = iris_imgs.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
             optimizer.zero_grad()
             
@@ -43,20 +44,21 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10
             if (i + 1) % 10 == 0:
                 print(f"  Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}", flush=True)
 
+        end_time = time.time()
         epoch_loss = running_loss / len(train_loader)
         epoch_acc = 100 * correct / total
-        print(f"Epoch [{epoch+1}/{num_epochs}] Complete. Avg Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%", flush=True)
+        print(f"Epoch [{epoch+1}/{num_epochs}] Complete. Time: {end_time - start_time:.2f}s. Avg Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%", flush=True)
 
-def evaluate_model(model, test_loader, device, classes):
+def evaluate_model(model, test_loader, device):
     model.eval()
     all_preds = []
     all_labels = []
     
     with torch.no_grad():
         for hand_imgs, iris_imgs, labels in test_loader:
-            hand_imgs = hand_imgs.to(device)
-            iris_imgs = iris_imgs.to(device)
-            labels = labels.to(device)
+            hand_imgs = hand_imgs.to(device, non_blocking=True)
+            iris_imgs = iris_imgs.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
             outputs = model(hand_imgs, iris_imgs)
             _, predicted = torch.max(outputs.data, 1)
@@ -74,28 +76,37 @@ def evaluate_model(model, test_loader, device, classes):
     print(f"Recall:    {recall:.4f}", flush=True)
     print(f"F1 Score:  {f1:.4f}", flush=True)
     
-    # Simple report for the user
     return acc, precision, recall, f1
 
 def main():
-    # Parameters
-    BATCH_SIZE = 16 # Small batch size due to high res images and limited memory
+    # Parameters for OPTIMIZED Training
+    BATCH_SIZE = 64 # Increased from 16
     NUM_EPOCHS = 10
     LEARNING_RATE = 0.001
-    DATASET_ROOT = r"C:\Users\win10\.cache\kagglehub\datasets\olankadhim\multimodal-biometric-dataset-mulb\versions\1\MULB dataset"
+    # OPTIMIZED DATASET PATH
+    DATASET_ROOT = r"C:\Users\win10\.cache\kagglehub\datasets\olankadhim\multimodal-biometric-dataset-mulb\versions\1\MULB dataset_224"
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"Checking GPU availability...", flush=True)
+    if torch.cuda.is_available():
+        print(f"Using device: {torch.cuda.get_device_name(0)}", flush=True)
+        device = torch.device("cuda")
+        torch.backends.cudnn.benchmark = True # Enable cudnn autotuner
+    else:
+        print("CUDA NOT Available. Using CPU.", flush=True)
+        device = torch.device("cpu")
 
-    # Transforms
+    # Transforms (No Resize, just Normalization)
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     # Dataset & Dataloaders
-    print("Preparing dataset...")
+    print("Preparing dataset...", flush=True)
+    if not os.path.exists(DATASET_ROOT):
+         print(f"Error: Dataset not found at {DATASET_ROOT}")
+         return
+
     full_dataset = MULBDataset(DATASET_ROOT, transform=transform)
     num_classes = len(full_dataset.classes)
     print(f"Total samples: {len(full_dataset)}, Total classes: {num_classes}")
@@ -104,8 +115,9 @@ def main():
     test_size = len(full_dataset) - train_size
     train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
     
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    # Optimized DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True, persistent_workers=True)
     
     # Model Setup
     model = LateFusionModel(num_classes=num_classes).to(device)
@@ -113,16 +125,16 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
     # Training
-    print("Starting training...")
+    print("Starting optimized training...", flush=True)
     train_model(model, train_loader, criterion, optimizer, device, num_epochs=NUM_EPOCHS)
     
     # Evaluation
-    print("Starting evaluation...")
-    evaluate_model(model, test_loader, device, full_dataset.classes)
+    print("Starting evaluation...", flush=True)
+    evaluate_model(model, test_loader, device)
     
     # Save Model
-    torch.save(model.state_dict(), "late_fusion_mulb_model.pth")
-    print("Model saved to late_fusion_mulb_model.pth")
+    torch.save(model.state_dict(), "late_fusion_mulb_optimized.pth")
+    print("Model saved to late_fusion_mulb_optimized.pth")
 
 if __name__ == "__main__":
     main()
