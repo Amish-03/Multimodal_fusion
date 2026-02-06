@@ -83,25 +83,70 @@ python train_evaluate.py
 
 ## 📁 File Structure
 
-*   `train_evaluate.py`: The main entry point. Handles data loading, model initialization, training loop, and evaluation.
-*   `late_fusion_model.py`: Defines the `LateFusionModel` class with the dual-ResNet architecture.
-*   `multimodal_dataset.py`: Defines the `MULBDataset` class, handling the pairing of hand and iris images for each subject.
-*   `download_data.py`: Script to download the dataset from Kaggle.
-*   `analyze_dataset.py`: Helper script to analyze dataset distribution (optional).
+### Core Training Scripts
+*   `train_evaluate.py`: Main entry point for Late Fusion training.
+*   `train_evaluate_early_fusion.py`: Early Fusion training script.
+*   `train_unimodal_optimized.py`: Optimized unimodal training with parallel GPU loading.
+*   `preprocess_gpu.py`: Pre-resize images to 224x224 for faster loading.
+
+### Models
+*   `late_fusion_model.py`: Dual-ResNet Late Fusion architecture.
+*   `early_fusion_model.py`: Single-ResNet Early Fusion architecture.
+*   `unimodal_model.py`: Single-modality ResNet model.
+
+### Datasets
+*   `multimodal_dataset.py`: Paired Hand + Iris dataset for fusion models.
+*   `unimodal_dataset_optimized.py`: Optimized single-modality dataset.
+
+### Evaluation
+*   `evaluate_confusion_matrix.py`: Late Fusion confusion matrix.
+*   `evaluate_confusion_matrix_early.py`: Early Fusion confusion matrix.
+*   `evaluate_confusion_matrix_unimodal.py`: Hand/Iris unimodal confusion matrices.
+*   `compare_all_models.py`: Compare all model architectures.
 
 
-## ⚔️ Fusion Strategy Comparison
+## ⚔️ Model Comparison (Fusion vs. Unimodal)
 
-We compared **Early Fusion** vs. **Late Fusion**.
-*   **Late Fusion**: ~98.4% Accuracy
-*   **Early Fusion**: ~92.7% Accuracy
+We compared **Early Fusion**, **Late Fusion**, and **Unimodal** baselines.
 
-Model | Train Time | Accuracy | Description
---- | --- | --- | ---
-**Late Fusion** | 13s/epoch | 98.38% | 2x ResNet18 (Feature Concat)
-**Early Fusion** | 8.5s/epoch | 92.66% | 1x ResNet18 (Input Concat)
+| Model | Test Accuracy | Train Time | Description |
+| --- | --- | --- | --- |
+| **Iris Only** 🏆 | **99.73%** | 7.2s/epoch | Single ResNet18 (Iris) |
+| **Late Fusion** | 98.38% | 13s/epoch | 2x ResNet18 (Feature Concat) |
+| **Early Fusion** | 92.66% | 8.5s/epoch | 1x ResNet18 (Input Concat) |
+| **Hand Only** | 88.59% | 7.6s/epoch | Single ResNet18 (Hand) |
+
+### Key Insights:
+- **Iris-only model achieves highest accuracy (99.73%)** - iris patterns are highly discriminative
+- **Late Fusion** combines both modalities for multi-factor authentication
+- **Hand biometrics** is more challenging with 188 classes
 
 👉 **[Read the Full Comparison Report](FUSION_COMPARISON.md)**
+
+---
+
+## 🎯 Unimodal Training
+
+Train individual modality models (Hand-only or Iris-only):
+
+```bash
+# Pre-resize all images first (one-time)
+python preprocess_gpu.py
+
+# Train both modalities with optimized parallel loading
+python train_unimodal_optimized.py --modality both --epochs 10
+
+# Train single modality
+python train_unimodal_optimized.py --modality iris --epochs 10
+python train_unimodal_optimized.py --modality hand --epochs 10
+```
+
+### Generate Confusion Matrices:
+```bash
+python evaluate_confusion_matrix_unimodal.py --modality both
+```
+
+Generates: `confusion_matrix_hand.png`, `confusion_matrix_iris.png`
 
 ## 📊 Performance Metrics
 

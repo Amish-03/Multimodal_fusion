@@ -1,16 +1,26 @@
-# ⚔️ Fusion Strategy Comparison: Early vs. Late Fusion
+# ⚔️ Fusion Strategy Comparison: Early vs. Late vs. Unimodal
 
-This document documents the experimental results comparing two multimodal fusion strategies—**Early Fusion** and **Late Fusion**—applied to the MULB (Hand + Iris) biometric dataset.
+This document documents the experimental results comparing multimodal fusion strategies—**Early Fusion**, **Late Fusion**, and **Unimodal** baselines—applied to the MULB (Hand + Iris) biometric dataset.
 
 ## 📊 Performance Summary
 
-| Metric | Late Fusion 🔴 | Early Fusion 🟠 | Winner 🏆 |
-| :--- | :--- | :--- | :--- |
-| **Test Accuracy** | **98.38%** | 92.66% | **Late Fusion** |
-| **Training Speed** | ~13.0 sec / epoch | **~8.5 sec / epoch** | Early Fusion |
-| **Model Size** | Two Backbones (2x ResNet18) | Single Backbone (1x ResNet18 modified) | Early Fusion |
-| **Convergence** | Stable, monotonic improvement | Fast initially, unstable at later epochs | Late Fusion |
-| **Complexity** | High (Dual stream) | Low (Single stream) | Early Fusion |
+### Complete Model Comparison
+
+| Model | Test Accuracy | Training Speed | Model Size | Winner 🏆 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Late Fusion** 🔴 | **98.38%** | ~13.0 sec/epoch | 2x ResNet18 | ✅ Best Accuracy |
+| **Early Fusion** 🟠 | 92.66% | ~8.5 sec/epoch | 1x ResNet18 | Fastest |
+| **Iris Only** 🔵 | 99.73% | ~7.2 sec/epoch | 1x ResNet18 | Single Modality Best |
+| **Hand Only** 🟢 | 88.59% | ~7.6 sec/epoch | 1x ResNet18 | Baseline |
+
+### Unimodal vs. Fusion Analysis
+
+| Metric | Hand Only | Iris Only | Late Fusion | Early Fusion |
+| :--- | :--- | :--- | :--- | :--- |
+| **Accuracy** | 88.59% | **99.73%** | 98.38% | 92.66% |
+| **Precision** | 0.8844 | **0.9973** | 0.9838 | 0.9266 |
+| **Recall** | 0.8175 | **0.9973** | 0.9838 | 0.9266 |
+| **F1 Score** | 0.8160 | **0.9973** | 0.9838 | 0.9266 |
 
 *Note: Results based on 10 epochs of training with Batch Size 64 on RTX 3060.*
 
@@ -42,12 +52,28 @@ The **Early Fusion** model merges the raw data immediately before processing.
 
 ## 📉 Visualizations
 
-Confusion matrices were generated for both models:
+Confusion matrices were generated for all models:
 
+### Fusion Models
 *   **Late Fusion**: `confusion_matrix_late.png` (Shows high diagonal dominance)
 *   **Early Fusion**: `confusion_matrix_early.png` (Good diagonal, but more off-diagonal noise)
 
+### Unimodal Models
+*   **Hand Only**: `confusion_matrix_hand.png` (88.59% accuracy, 188 classes)
+*   **Iris Only**: `confusion_matrix_iris.png` (99.73% accuracy, near-perfect diagonal)
+
 ## 💡 Conclusion
 
-For this specific multimodal biometric task, **Late Fusion is superior**. 
-While Early Fusion is ~35% faster to train, the **+5.7% accuracy gap** makes Late Fusion the preferred choice for a security-critical application like biometric authentication. The independence of feature extraction seems crucial when merging modalities with such different visual characteristics.
+### Key Findings:
+
+1. **Iris modality alone achieves 99.73%** - outperforming all fusion methods, suggesting iris is the dominant biometric trait.
+2. **Hand modality alone achieves 88.59%** - a challenging biometric with 188 classes.
+3. **Late Fusion (98.38%)** provides robust multi-factor authentication but doesn't exceed unimodal iris.
+4. **Early Fusion (92.66%)** is fastest but loses accuracy due to early feature mixing.
+
+### Recommendations:
+- For **maximum accuracy**: Use Iris-only model (99.73%)
+- For **multi-factor security**: Use Late Fusion (combines both modalities)
+- For **speed-critical applications**: Use Early Fusion with acceptable accuracy trade-off
+
+The independence of feature extraction in Late Fusion seems crucial when merging modalities with different visual characteristics, but the exceptional performance of iris-only suggests the dataset's iris patterns are highly discriminative.
