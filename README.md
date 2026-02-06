@@ -1,5 +1,22 @@
 # Multimodal Biometric Fusion System (Hand + Iris)
 
+
+## 🌟 What is this project? (In Simple Terms)
+
+Imagine a high-security lock that doesn't just ask for a key, but checks **two** unique parts of your body to verify your identity:
+1.  **Your Hand**: The shape and vein patterns of your hand.
+2.  **Your Eye (Iris)**: The unique patterns in the colored part of your eye.
+
+This project builds an **Artificial Intelligence (AI)** system that looks at pictures of both your hand and your eye *at the same time*. It combines the information from both sources to decide exactly who you are.
+
+By "fusing" these two pieces of evidence, the system becomes:
+*   **More Accurate**: If one picture is blurry, the other can still confirm your identity.
+*   **More Secure**: It is much harder to fake both a hand and an iris than just one of them.
+
+---
+
+## 🔧 Technical Overview
+
 This repository contains the implementation of a **Multimodal Biometric Recognition System** that fuses **Hand** and **Iris** modalities using a **Late Fusion** Deep Learning approach. The system is built using PyTorch and utilizes pre-trained ResNet18 models for feature extraction.
 
 ## 📌 Project Overview
