@@ -73,7 +73,7 @@ python train_evaluate.py
 
 **Key Parameters in `train_evaluate.py`:**
 *   `BATCH_SIZE`: 16 (Adjust based on VRAM)
-*   `NUM_EPOCHS`: 5 (Default)
+*   `NUM_EPOCHS`: 10
 *   `LEARNING_RATE`: 0.001
 
 ### 3. Output
