@@ -1,4 +1,8 @@
 
+"""
+Train and evaluate unimodal models (Hand-only or Iris-only).
+Compare results against fusion models.
+"""
 import os
 import torch
 import torch.nn as nn
@@ -6,11 +10,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-import numpy as np
 import time
+import argparse
 
-from multimodal_dataset import MULBDataset
-from late_fusion_model import LateFusionModel
+from unimodal_dataset import UnimodalDataset
+from unimodal_model import UnimodalModel
+
 
 def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10):
     model.train()
@@ -20,17 +25,16 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10
         correct = 0
         total = 0
         
-        print(f"Epoch {epoch+1}/{num_epochs}", flush=True)
         start_time = time.time()
+        print(f"Epoch {epoch+1}/{num_epochs}", flush=True)
         
-        for i, (hand_imgs, iris_imgs, labels) in enumerate(train_loader):
-            hand_imgs = hand_imgs.to(device)
-            iris_imgs = iris_imgs.to(device)
-            labels = labels.to(device)
+        for i, (images, labels) in enumerate(train_loader):
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
             optimizer.zero_grad()
             
-            outputs = model(hand_imgs, iris_imgs)
+            outputs = model(images)
             loss = criterion(outputs, labels)
             
             loss.backward()
@@ -49,53 +53,55 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10
         epoch_acc = 100 * correct / total
         print(f"Epoch [{epoch+1}/{num_epochs}] Complete. Time: {end_time - start_time:.2f}s. Avg Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%", flush=True)
 
+
 def evaluate_model(model, test_loader, device):
     model.eval()
     all_preds = []
     all_labels = []
     
     with torch.no_grad():
-        for hand_imgs, iris_imgs, labels in test_loader:
-            hand_imgs = hand_imgs.to(device)
-            iris_imgs = iris_imgs.to(device)
-            labels = labels.to(device)
+        for images, labels in test_loader:
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             
-            outputs = model(hand_imgs, iris_imgs)
+            outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             
             all_preds.extend(predicted.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-    # Metrics
     acc = accuracy_score(all_labels, all_preds)
     precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, average='weighted', zero_division=0)
     
-    print("\nEvaluation Results:", flush=True)
-    print(f"Accuracy:  {acc:.4f}", flush=True)
-    print(f"Precision: {precision:.4f}", flush=True)
-    print(f"Recall:    {recall:.4f}", flush=True)
-    print(f"F1 Score:  {f1:.4f}", flush=True)
-    
     return acc, precision, recall, f1
 
+
 def main():
+    parser = argparse.ArgumentParser(description='Train Unimodal Biometric Model')
+    parser.add_argument('--modality', type=str, choices=['hand', 'iris'], required=True, help='Modality to train on: hand or iris')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    args = parser.parse_args()
+
     # Parameters
-    BATCH_SIZE = 16 
-    NUM_EPOCHS = 1
+    BATCH_SIZE = args.batch_size
+    NUM_EPOCHS = args.epochs
     LEARNING_RATE = 0.001
+    MODALITY = args.modality
     DATASET_ROOT = r"C:\Users\win10\.cache\kagglehub\datasets\olankadhim\multimodal-biometric-dataset-mulb\versions\1\MULB dataset"
     
-    print(f"Checking GPU availability...", flush=True)
+    print(f"\n{'='*60}")
+    print(f"  Training UNIMODAL Model: {MODALITY.upper()} ONLY")
+    print(f"{'='*60}\n")
+
+    # Device setup
     if torch.cuda.is_available():
-        print(f"CUDA Available: True", flush=True)
-        print(f"GPU Capability: {torch.cuda.get_device_capability()}", flush=True)
-        print(f"Device Name: {torch.cuda.get_device_name(0)}", flush=True)
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}", flush=True)
         device = torch.device("cuda")
+        torch.backends.cudnn.benchmark = True
     else:
         print("CUDA NOT Available. Using CPU.", flush=True)
         device = torch.device("cpu")
-    
-    print(f"Using device: {device}", flush=True)
 
     # Transforms
     transform = transforms.Compose([
@@ -105,8 +111,8 @@ def main():
     ])
 
     # Dataset & Dataloaders
-    print("Preparing dataset...", flush=True)
-    full_dataset = MULBDataset(DATASET_ROOT, transform=transform)
+    print(f"Preparing {MODALITY} dataset...", flush=True)
+    full_dataset = UnimodalDataset(DATASET_ROOT, modality=MODALITY, transform=transform)
     num_classes = len(full_dataset.classes)
     print(f"Total samples: {len(full_dataset)}, Total classes: {num_classes}")
     
@@ -114,22 +120,36 @@ def main():
     test_size = len(full_dataset) - train_size
     train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
     
-    # Enable num_workers and pin_memory for better data throughput
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
     
     # Model Setup
-    model = LateFusionModel(num_classes=num_classes).to(device)
+    model = UnimodalModel(num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
     # Training
-    print("Starting training...", flush=True)
+    print(f"Starting {MODALITY.upper()} training...", flush=True)
     train_model(model, train_loader, criterion, optimizer, device, num_epochs=NUM_EPOCHS)
     
     # Evaluation
-    print("Starting evaluation...", flush=True)
-    evaluate_model(model, test_loader, device)
+    print(f"\nEvaluating {MODALITY.upper()} model...", flush=True)
+    acc, precision, recall, f1 = evaluate_model(model, test_loader, device)
     
+    print("\n" + "="*60)
+    print(f"  {MODALITY.upper()} MODEL RESULTS")
+    print("="*60)
+    print(f"  Accuracy:  {acc*100:.2f}%")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall:    {recall:.4f}")
+    print(f"  F1 Score:  {f1:.4f}")
+    print("="*60 + "\n")
+    
+    # Save Model
+    model_path = f"{MODALITY}_only_model.pth"
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
+
+
 if __name__ == "__main__":
     main()
